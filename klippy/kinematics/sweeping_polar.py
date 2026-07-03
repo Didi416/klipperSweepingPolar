@@ -37,7 +37,7 @@ class SweepingPolarKinematics:
         self.distfrombed = distfrombed = config.getfloat('distfrombed', above=0.)
         #
         rail_z = stepper.LookupMultiRail(config.getsection('stepper_z'))
-        stepper_bed.setup_itersolve('sweeping_polar_stepper_alloc', b'a', distfrombed)
+        stepper_bed.setup_itersolve('sweeping_polar_stepper_alloc', b'a', distfrombed)  #setup_itersolve is what links to the kin_sweeping_polar.c. The b'a' signifies the bed. the b'r' signifies the arm
         stepper_arm.setup_itersolve('sweeping_polar_stepper_alloc', b'r', distfrombed)
         rail_z.setup_itersolve('cartesian_stepper_alloc', b'z')
         self.rails = [stepper_bed, stepper_arm, rail_z]
