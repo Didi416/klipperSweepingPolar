@@ -41,6 +41,8 @@ class SweepingPolarKinematics:
         stepper_arm.setup_itersolve('sweeping_polar_stepper_alloc', b'r', distfrombed)
         rail_z.setup_itersolve('cartesian_stepper_alloc', b'z')
         self.rails = [stepper_bed, stepper_arm, rail_z]
+        
+        self.steppers = [s for r in self.rails for s in r.get_steppers()]
     
         for s in self.get_steppers():
             s.set_trapq(toolhead.get_trapq())
@@ -69,9 +71,9 @@ class SweepingPolarKinematics:
         self.printer = config.get_printer()
         ffi_main, ffi_lib = chelper.get_ffi()
         self.cartesian_kinematics_L = ffi_main.gc(
-            ffi_lib.cartesian_stepper_alloc('x'), ffi_lib.free)
+            ffi_lib.cartesian_stepper_alloc(b'x'), ffi_lib.free)
         self.cartesian_kinematics_R = ffi_main.gc(
-            ffi_lib.cartesian_stepper_alloc('y'), ffi_lib.free)
+            ffi_lib.cartesian_stepper_alloc(b'y'), ffi_lib.free)
 
 
 
@@ -97,6 +99,8 @@ class SweepingPolarKinematics:
         # XXX - homing not implemented
         pass
 
+    def get_arm_steppers(self):
+        return [s for rail in self.rails[:2] for s in rail.get_steppers()]
 
     def home(self, homing_state):
         # XXX - homing not implemented
