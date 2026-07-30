@@ -107,46 +107,46 @@ class SweepingPolarKinematics:
         axes = homing_state.get_axes()
         
         if 0 in axes or 1 in axes: #  XY
-            # Home left and right at the same time
-            self.homedXY = False
             homing_state.set_axes([0, 1])
             rails = [self.rails[0], self.rails[1]]
             l_endstop = rails[0].get_homing_info().position_endstop
             l_min, l_max = rails[0].get_range()
-
             r_endstop = rails[1].get_homing_info().position_endstop
             r_min, r_max = rails[1].get_range()
-
-            # Swap to linear kinematics
+            # Swap to linear kinematics so each joint can be homed independently
             toolhead = self.printer.lookup_object('toolhead')
             toolhead.flush_step_generation()
-
             steppers = self.get_arm_steppers()
             kinematics = [self.cartesian_kinematics_L,
-                          self.cartesian_kinematics_R]
-            prev_sks    = [stepper.set_stepper_kinematics(kinematic)
-                            for stepper, kinematic in zip(steppers, kinematics)]
-
+                            self.cartesian_kinematics_R]
+            prev_sks = [stepper.set_stepper_kinematics(kinematic)
+                        for stepper, kinematic in zip(steppers, kinematics)]
             try:
-                homepos  = [l_endstop, r_endstop, None, None]
-                hil = rails[0].get_homing_info()
-                if hil.positive_dir:
-                    forcepos = [0, 0, None, None]
-                else:
-                    forcepos = [l_max, r_max, None, None]
-                
-
+                homepos = [l_endstop, r_endstop, None, None]
+                # Compute forcepos per-rail, not just from the bed's direction
+                bed_hi = rails[0].get_homing_info()
+                arm_hi = rails[1].get_homing_info()
+                forcepos = [None, None, None, None]
+                forcepos[0] = (l_min if bed_hi.positive_dir else l_max)
+                forcepos[1] = (r_min if arm_hi.positive_dir else r_max)
                 homing_state.home_rails(rails, forcepos, homepos)
-                #swap back to sweeping polar 
+                # Swap back to the real sweeping-polar kinematics
                 for stepper, prev_sk in zip(steppers, prev_sks):
                     stepper.set_stepper_kinematics(prev_sk)
-                #code to convert the fake cartesian position to the correct position. for now it will default to 0,0
-                [x,y] = [0,0]
-                toolhead.set_position( [x, y, 0, 0], (0, 1))
+                # We now know the exact joint angles (they're the endstops),
+                # so compute the *real* toolhead XY via forward kinematics --
+                # same formula as calc_position -- instead of faking (0,0).
+                bed_angle = l_endstop
+                arm_angle = r_endstop
+                d = self.distfrombed
+                x = d*math.cos(bed_angle) + d*math.cos(bed_angle+arm_angle)
+                y = d*math.sin(bed_angle) + d*math.sin(bed_angle+arm_angle)
+                # Preserve Z/E instead of clobbering them
+                cur_pos = toolhead.get_position()
+                toolhead.set_position([x, y, cur_pos[2], cur_pos[3]], (0, 1))
                 toolhead.flush_step_generation()
-                #self.homedXY = True
-                logging.info("Homed LR done")
-
+                logging.info("Homed LR done: bed=%.3f arm=%.3f -> x=%.3f y=%.3f",
+                                bed_angle, arm_angle, x, y)
             except Exception as e:
                 for stepper, prev_sk in zip(steppers, prev_sks):
                     stepper.set_stepper_kinematics(prev_sk)
