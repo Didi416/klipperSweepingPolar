@@ -117,18 +117,27 @@ class SweepingPolarKinematics:
             toolhead = self.printer.lookup_object('toolhead')
             toolhead.flush_step_generation()
             steppers = self.get_arm_steppers()
-            kinematics = [self.cartesian_kinematics_L,
-                            self.cartesian_kinematics_R]
+            kinematics = [self.cartesian_kinematics_L, self.cartesian_kinematics_R]
+            # Save previous kinematics
             prev_sks = [stepper.set_stepper_kinematics(kinematic)
                         for stepper, kinematic in zip(steppers, kinematics)]
             try:
                 homepos = [l_endstop, r_endstop, None, None]
-                # Compute forcepos per-rail, not just from the bed's direction
+                # Compute forcepos per-rail
                 bed_hi = rails[0].get_homing_info()
                 arm_hi = rails[1].get_homing_info()
                 forcepos = [None, None, None, None]
-                forcepos[0] = (l_min if bed_hi.positive_dir else l_max)
-                forcepos[1] = (r_min if arm_hi.positive_dir else r_max)
+                # forcepos[0] = (l_min if bed_hi.positive_dir else l_max)
+                # forcepos[1] = (r_min if arm_hi.positive_dir else r_max)
+                if bed_hi.positive_dir:
+                    forcepos[0] = l_endstop - 1.5 * (l_endstop - l_min)
+                else:
+                    forcepos[0] = l_endstop + 1.5 * (l_max - l_endstop)
+
+                if arm_hi.positive_dir:
+                    forcepos[1] = r_endstop - 1.5 * (r_endstop - r_min)
+                else:
+                    forcepos[1] = r_endstop + 1.5 * (r_max - r_endstop)
                 homing_state.home_rails(rails, forcepos, homepos)
                 # Swap back to the real sweeping-polar kinematics
                 for stepper, prev_sk in zip(steppers, prev_sks):
